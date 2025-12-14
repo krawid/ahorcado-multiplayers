@@ -1,0 +1,87 @@
+.waiting-room {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+  text-align: center;
+}
+
+.waiting-room h1 {
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+  color: #2c3e50;
+}
+
+.room-info {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 3rem;
+  margin-bottom: 2rem;
+  max-width: 500px;
+  width: 100%;
+}
+
+.room-info p {
+  font-size: 1.1rem;
+  color: #495057;
+  margin-bottom: 1.5rem;
+}
+
+.room-code-display {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.room-code {
+  font-size: 3rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: #007bff;
+  font-family: 'Courier New', monospace;
+  padding: 1rem 2rem;
+  background: white;
+  border-radius: 8px;
+  border: 3px solid #007bff;
+}
+
+.waiting-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .waiting-room h1 {
+    font-size: 2rem;
+  }
+
+  .room-code {
+    font-size: 2rem;
+    padding: 0.75rem 1.5rem;
+  }
+
+  .room-code-display {
+    flex-direction: column;
+  }
+}

@@ -3,10 +3,14 @@ import { HangmanGame } from './gameLogic.js';
 import { loadSettings, saveSettings } from './utils/storageUtils.js';
 import { initializeAriaRegions, announceToScreenReader } from './utils/ariaUtils.js';
 import { audioSystem } from './utils/audioSystem.js';
+import { socketService } from './utils/socketService.js';
 import StartScreen from './components/StartScreen.jsx';
 import GameScreen from './components/GameScreen.jsx';
 import GameOverModal from './components/GameOverModal.jsx';
 import WordManagementModal from './components/WordManagementModal.jsx';
+import MultiplayerLobby from './components/MultiplayerLobby.jsx';
+import MultiplayerWaitingRoom from './components/MultiplayerWaitingRoom.jsx';
+import MultiplayerGameScreen from './components/MultiplayerGameScreen.jsx';
 import './App.css';
 
 /**
@@ -14,7 +18,7 @@ import './App.css';
  * Maneja el estado global y la navegación entre pantallas
  */
 function App() {
-  const [currentScreen, setCurrentScreen] = useState('start'); // 'start' o 'game'
+  const [currentScreen, setCurrentScreen] = useState('start'); // 'start', 'game', 'multiplayer-lobby', 'multiplayer-waiting', 'multiplayer-game'
   const [game, setGame] = useState(null);
   const [gameState, setGameState] = useState(null);
   const [showWordManagement, setShowWordManagement] = useState(false);
@@ -23,6 +27,11 @@ function App() {
     difficulty: 'Normal',
     soundEnabled: true
   });
+  
+  // Estados para multijugador
+  const [multiplayerRoom, setMultiplayerRoom] = useState(null);
+  const [multiplayerRole, setMultiplayerRole] = useState(null); // 'host' o 'guest'
+  const [multiplayerGameState, setMultiplayerGameState] = useState(null);
 
   // Inicializar al montar
   useEffect(() => {
@@ -45,8 +54,75 @@ function App() {
 
     return () => {
       document.removeEventListener('click', initAudio);
+      // Desconectar socket al desmontar
+      socketService.disconnect();
     };
   }, []);
+
+  // Configurar listeners de Socket.io para multijugador
+  useEffect(() => {
+    if (!multiplayerRoom) return;
+
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    // Cuando el invitado se une
+    socket.on('player-joined', () => {
+      announceToScreenReader('Tu amigo se ha unido a la sala', 'polite');
+    });
+
+    // Cuando el juego comienza
+    socket.on('game-started', (gameState) => {
+      setMultiplayerGameState(gameState);
+      setCurrentScreen('multiplayer-game');
+      announceToScreenReader('El juego ha comenzado', 'polite');
+    });
+
+    // Resultado de adivinanza
+    socket.on('guess-result', ({ letter, correct, gameState }) => {
+      setMultiplayerGameState(gameState);
+      
+      if (correct) {
+        audioSystem.playCorrectSound();
+        announceToScreenReader(`Correcto! La letra ${letter} está en la palabra`, 'assertive');
+      } else {
+        audioSystem.playIncorrectSound();
+        announceToScreenReader(`Incorrecto. La letra ${letter} no está en la palabra`, 'assertive');
+      }
+
+      // Si el juego terminó
+      if (gameState.gameOver) {
+        setTimeout(async () => {
+          if (gameState.won) {
+            await audioSystem.playWinSound();
+          } else {
+            await audioSystem.playLoseSound();
+          }
+        }, 500);
+      }
+    });
+
+    // Cuando el juego se reinicia
+    socket.on('game-reset', (gameState) => {
+      setMultiplayerGameState(gameState);
+      setCurrentScreen('multiplayer-waiting');
+      announceToScreenReader('Nueva partida. Esperando a que el host establezca la palabra', 'polite');
+    });
+
+    // Cuando un jugador se desconecta
+    socket.on('player-disconnected', () => {
+      announceToScreenReader('Tu amigo se ha desconectado', 'assertive');
+      handleMultiplayerExit();
+    });
+
+    return () => {
+      socket.off('player-joined');
+      socket.off('game-started');
+      socket.off('guess-result');
+      socket.off('game-reset');
+      socket.off('player-disconnected');
+    };
+  }, [multiplayerRoom]);
 
   // Guardar configuraciones cuando cambien
   useEffect(() => {
@@ -218,6 +294,73 @@ function App() {
     setShowWordManagement(false);
   };
 
+  // Handlers de multijugador
+  const handlePlayMultiplayer = () => {
+    socketService.connect();
+    setCurrentScreen('multiplayer-lobby');
+  };
+
+  const handleCreateRoom = () => {
+    const socket = socketService.getSocket();
+    
+    const maxAttempts = settings.difficulty === 'Fácil' ? 8 : settings.difficulty === 'Normal' ? 6 : 4;
+    
+    socket.emit('create-room', { maxAttempts }, (response) => {
+      if (response.success) {
+        setMultiplayerRoom(response.roomCode);
+        setMultiplayerRole(response.role);
+        setCurrentScreen('multiplayer-waiting');
+      } else {
+        announceToScreenReader('Error al crear sala', 'assertive');
+      }
+    });
+  };
+
+  const handleJoinRoom = (roomCode) => {
+    const socket = socketService.getSocket();
+    
+    socket.emit('join-room', roomCode, (response) => {
+      if (response.success) {
+        setMultiplayerRoom(response.roomCode);
+        setMultiplayerRole(response.role);
+        // El servidor enviará 'game-started' cuando el host establezca la palabra
+      } else {
+        announceToScreenReader(response.message || 'Error al unirse a la sala', 'assertive');
+      }
+    });
+  };
+
+  const handleMultiplayerBack = () => {
+    socketService.disconnect();
+    setCurrentScreen('start');
+    setMultiplayerRoom(null);
+    setMultiplayerRole(null);
+    setMultiplayerGameState(null);
+  };
+
+  const handleMultiplayerExit = () => {
+    socketService.disconnect();
+    setCurrentScreen('start');
+    setMultiplayerRoom(null);
+    setMultiplayerRole(null);
+    setMultiplayerGameState(null);
+  };
+
+  const handleSetWord = (word) => {
+    const socket = socketService.getSocket();
+    socket.emit('set-word', multiplayerRoom, word);
+  };
+
+  const handleMultiplayerGuess = (letter) => {
+    const socket = socketService.getSocket();
+    socket.emit('guess-letter', multiplayerRoom, letter);
+  };
+
+  const handleNewMultiplayerGame = () => {
+    const socket = socketService.getSocket();
+    socket.emit('new-game', multiplayerRoom);
+  };
+
   return (
     <div className="app">
       {currentScreen === 'start' && (
@@ -228,6 +371,7 @@ function App() {
           onChangeCategory={handleChangeCategory}
           onChangeDifficulty={handleChangeDifficulty}
           onManageWords={handleManageWords}
+          onPlayMultiplayer={handlePlayMultiplayer}
         />
       )}
 
@@ -251,6 +395,33 @@ function App() {
             />
           )}
         </>
+      )}
+
+      {currentScreen === 'multiplayer-lobby' && (
+        <MultiplayerLobby
+          onCreateRoom={handleCreateRoom}
+          onJoinRoom={handleJoinRoom}
+          onBack={handleMultiplayerBack}
+        />
+      )}
+
+      {currentScreen === 'multiplayer-waiting' && (
+        <MultiplayerWaitingRoom
+          roomCode={multiplayerRoom}
+          onCancel={handleMultiplayerExit}
+        />
+      )}
+
+      {currentScreen === 'multiplayer-game' && multiplayerGameState && (
+        <MultiplayerGameScreen
+          gameState={multiplayerGameState}
+          role={multiplayerRole}
+          roomCode={multiplayerRoom}
+          onSetWord={handleSetWord}
+          onGuess={handleMultiplayerGuess}
+          onNewGame={handleNewMultiplayerGame}
+          onExit={handleMultiplayerExit}
+        />
       )}
 
       {/* Modal de gestión de palabras */}

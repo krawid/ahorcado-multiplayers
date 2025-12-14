@@ -13,7 +13,8 @@ export default function StartScreen({
   onStartGame, 
   onChangeCategory, 
   onChangeDifficulty,
-  onManageWords 
+  onManageWords,
+  onPlayMultiplayer
 }) {
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showDifficultyDialog, setShowDifficultyDialog] = useState(false);
@@ -120,7 +121,14 @@ export default function StartScreen({
           className="btn btn-primary btn-large"
           onClick={handleStartGame}
         >
-          Jugar
+          Jugar Solo
+        </button>
+
+        <button
+          className="btn btn-primary btn-large"
+          onClick={onPlayMultiplayer}
+        >
+          Jugar con Amigo
         </button>
 
         <button
