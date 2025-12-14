@@ -10,12 +10,16 @@ const __dirname = dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 
-// Configurar Socket.io
+// Configurar Socket.io con opciones mejoradas
 const io = new Server(httpServer, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
-  }
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  connectTimeout: 45000,
+  transports: ['websocket', 'polling']
 });
 
 // Servir archivos estáticos del frontend
@@ -213,14 +217,19 @@ io.on('connection', (socket) => {
 
   // Unirse a sala
   socket.on('join-room', (roomCode, callback) => {
+    console.log(`Intento de unirse a sala ${roomCode} por ${socket.id}`);
+    console.log(`Salas activas:`, Array.from(rooms.keys()));
+    
     const room = rooms.get(roomCode);
     
     if (!room) {
+      console.log(`Sala ${roomCode} no encontrada`);
       callback({ success: false, message: 'Sala no encontrada' });
       return;
     }
 
     if (room.guestId) {
+      console.log(`Sala ${roomCode} ya está llena`);
       callback({ success: false, message: 'Sala llena' });
       return;
     }
@@ -228,7 +237,7 @@ io.on('connection', (socket) => {
     room.addGuest(socket.id);
     socket.join(roomCode);
     
-    console.log(`${socket.id} se unió a sala ${roomCode}`);
+    console.log(`${socket.id} se unió exitosamente a sala ${roomCode}`);
     
     const publicState = room.getPublicState();
     

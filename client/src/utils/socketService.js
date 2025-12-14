@@ -15,7 +15,13 @@ class SocketService {
     const url = import.meta.env.DEV ? 'http://localhost:3000' : window.location.origin;
     
     this.socket = io(url, {
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+      timeout: 20000,
+      autoConnect: true
     });
 
     this.socket.on('connect', () => {
@@ -23,9 +29,25 @@ class SocketService {
       this.connected = true;
     });
 
-    this.socket.on('disconnect', () => {
-      console.log('Desconectado del servidor');
+    this.socket.on('disconnect', (reason) => {
+      console.log('Desconectado del servidor:', reason);
       this.connected = false;
+    });
+
+    this.socket.on('connect_error', (error) => {
+      console.error('Error de conexión:', error);
+    });
+
+    this.socket.on('reconnect', (attemptNumber) => {
+      console.log('Reconectado después de', attemptNumber, 'intentos');
+    });
+
+    this.socket.on('reconnect_attempt', (attemptNumber) => {
+      console.log('Intento de reconexión', attemptNumber);
+    });
+
+    this.socket.on('reconnect_failed', () => {
+      console.error('Falló la reconexión');
     });
 
     return this.socket;
