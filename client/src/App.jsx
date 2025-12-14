@@ -323,7 +323,8 @@ function App() {
       if (response.success) {
         setMultiplayerRoom(response.roomCode);
         setMultiplayerRole(response.role);
-        // El servidor enviará 'game-started' cuando el host establezca la palabra
+        setCurrentScreen('multiplayer-waiting');
+        announceToScreenReader('Te has unido a la sala. Esperando a que el anfitrión establezca la palabra', 'polite');
       } else {
         announceToScreenReader(response.message || 'Error al unirse a la sala', 'assertive');
       }
@@ -408,6 +409,7 @@ function App() {
       {currentScreen === 'multiplayer-waiting' && (
         <MultiplayerWaitingRoom
           roomCode={multiplayerRoom}
+          role={multiplayerRole}
           onCancel={handleMultiplayerExit}
         />
       )}
