@@ -20,7 +20,13 @@ const io = new Server(httpServer, {
 
 // Servir archivos estáticos del frontend
 const clientPath = join(__dirname, '../client/dist');
-app.use(express.static(clientPath));
+app.use(express.static(clientPath, {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
 
 // Almacenamiento de salas en memoria
 const rooms = new Map();
@@ -123,11 +129,6 @@ app.get('/api/health', (req, res) => {
     message: 'Ahorcado Multiplayer Server',
     activeRooms: rooms.size 
   });
-});
-
-// Todas las demás rutas sirven el frontend
-app.get('*', (req, res) => {
-  res.sendFile(join(clientPath, 'index.html'));
 });
 
 // Conexión de Socket.io
@@ -259,6 +260,11 @@ setInterval(() => {
     }
   }
 }, 30 * 60 * 1000);
+
+// Todas las demás rutas sirven el frontend (debe ir al final)
+app.get('*', (req, res) => {
+  res.sendFile(join(clientPath, 'index.html'));
+});
 
 const PORT = process.env.PORT || 3000;
 
