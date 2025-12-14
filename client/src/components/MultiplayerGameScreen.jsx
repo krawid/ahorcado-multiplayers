@@ -117,6 +117,30 @@ export default function MultiplayerGameScreen({
     }
   };
 
+  // Función para anunciar la palabra actual (solo para el adivinador)
+  const announceCurrentWord = () => {
+    if (!iAmGuesser || !gameState.displayWord) return;
+    
+    const wordForSpeech = gameState.displayWord.split(' ').map(char => 
+      char === '_' ? 'guión bajo' : char
+    ).join(', ');
+    announceToScreenReader(`La palabra es: ${wordForSpeech}`, 'polite');
+  };
+
+  // Manejar atajo de teclado Ctrl+L para anunciar palabra
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ctrl+L para anunciar la palabra (solo si soy el adivinador)
+      if (e.ctrlKey && e.key === 'l' && iAmGuesser) {
+        e.preventDefault();
+        announceCurrentWord();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [iAmGuesser, gameState.displayWord]);
+
   // Si hay un ganador definitivo de la partida
   if (gameState.matchOver) {
     const iWon = (role === gameState.matchWinner);

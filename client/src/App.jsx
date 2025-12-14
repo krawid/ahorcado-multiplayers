@@ -86,7 +86,18 @@ function App() {
       
       if (correct) {
         audioSystem.playCorrectSound();
-        announceToScreenReader(`Correcto! La letra ${letter} está en la palabra`, 'assertive');
+        
+        // Si la letra es correcta y el juego no terminó, anunciar cómo queda la palabra
+        if (!gameState.gameOver && gameState.displayWord) {
+          const wordForSpeech = gameState.displayWord.split(' ').map(char => 
+            char === '_' ? 'guión bajo' : char
+          ).join(', ');
+          
+          // Anunciar después de un pequeño delay
+          setTimeout(() => {
+            announceToScreenReader(`La palabra queda: ${wordForSpeech}`, 'polite');
+          }, 800);
+        }
       } else {
         audioSystem.playIncorrectSound();
         announceToScreenReader(`Incorrecto. La letra ${letter} no está en la palabra`, 'assertive');
