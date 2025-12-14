@@ -177,21 +177,56 @@ export class AudioSystem {
    */
   async playAudioFile(audioPath, volume = 0.5) {
     if (!this.enabled) {
+      console.log('Audio deshabilitado');
       return;
     }
 
-    try {
-      const audio = new Audio(audioPath);
-      audio.volume = volume;
-      
-      return new Promise((resolve, reject) => {
-        audio.onended = resolve;
-        audio.onerror = reject;
-        audio.play().catch(reject);
-      });
-    } catch (error) {
-      console.error('Error al reproducir archivo de audio:', error);
-    }
+    return new Promise((resolve, reject) => {
+      try {
+        const audio = new Audio();
+        
+        // Configurar eventos ANTES de establecer src
+        audio.oncanplaythrough = () => {
+          console.log('Audio cargado y listo para reproducir');
+        };
+        
+        audio.onended = () => {
+          console.log('Audio terminó de reproducirse');
+          resolve();
+        };
+        
+        audio.onerror = (error) => {
+          console.error('Error en elemento audio:', error);
+          reject(new Error('Error al cargar audio'));
+        };
+        
+        // Configurar audio
+        audio.volume = volume;
+        audio.preload = 'auto';
+        audio.src = audioPath;
+        
+        // Intentar reproducir
+        const playPromise = audio.play();
+        
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              console.log('Reproducción iniciada exitosamente');
+            })
+            .catch((error) => {
+              console.error('Error al iniciar reproducción:', error.name, error.message);
+              // En iOS, si falla por política de autoplay, rechazar
+              reject(error);
+            });
+        } else {
+          // Navegadores antiguos que no devuelven Promise
+          console.log('Reproducción iniciada (navegador antiguo)');
+        }
+      } catch (error) {
+        console.error('Error al crear elemento Audio:', error);
+        reject(error);
+      }
+    });
   }
 
   /**
@@ -229,10 +264,12 @@ export class AudioSystem {
   async playMatchWinSound() {
     // Reproducir archivo de aplausos
     try {
-      await this.playAudioFile(applauseSound, 0.5);
+      console.log('Intentando reproducir aplausos...');
+      await this.playAudioFile(applauseSound, 0.6);
+      console.log('Aplausos reproducidos exitosamente');
     } catch (error) {
       // Si falla, usar melodía sintetizada como fallback
-      console.log('Usando sonido sintetizado como fallback');
+      console.warn('Error al reproducir aplausos, usando fallback:', error);
       const frequencies = [
         523.25, // C5
         659.25, // E5
@@ -250,10 +287,12 @@ export class AudioSystem {
   async playMatchLoseSound() {
     // Reproducir archivo de abucheo
     try {
-      await this.playAudioFile(booSound, 0.5);
+      console.log('Intentando reproducir abucheo...');
+      await this.playAudioFile(booSound, 0.6);
+      console.log('Abucheo reproducido exitosamente');
     } catch (error) {
       // Si falla, usar melodía sintetizada como fallback
-      console.log('Usando sonido sintetizado como fallback');
+      console.warn('Error al reproducir abucheo, usando fallback:', error);
       const frequencies = [
         523.25, // C5
         440.00, // A4

@@ -214,7 +214,8 @@ io.on('connection', (socket) => {
     
     socket.join(roomCode);
     
-    console.log(`Sala creada: ${roomCode}`);
+    console.log(`Sala creada: ${roomCode} por ${socket.id}`);
+    console.log(`Host ${socket.id} unido a sala ${roomCode}`);
     
     callback({ 
       success: true, 
@@ -246,11 +247,17 @@ io.on('connection', (socket) => {
     socket.join(roomCode);
     
     console.log(`${socket.id} se unió exitosamente a sala ${roomCode}`);
+    console.log(`Host ID en sala: ${room.hostId}`);
+    
+    // Verificar cuántos sockets hay en la sala
+    const socketsInRoom = io.sockets.adapter.rooms.get(roomCode);
+    console.log(`Sockets en sala ${roomCode}:`, socketsInRoom ? Array.from(socketsInRoom) : 'ninguno');
     
     const publicState = room.getPublicState();
     
-    // Notificar al host que el invitado se unió
-    io.to(room.hostId).emit('player-joined', publicState);
+    // Notificar a TODA la sala que el invitado se unió (más robusto que solo al hostId)
+    console.log(`Emitiendo player-joined a sala ${roomCode}`);
+    io.to(roomCode).emit('player-joined', publicState);
     
     callback({ 
       success: true, 

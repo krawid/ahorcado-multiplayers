@@ -66,11 +66,14 @@ function App() {
     const socket = socketService.getSocket();
     if (!socket) return;
 
-    // Cuando el invitado se une
+    // Cuando el invitado se une (solo el host debe reaccionar)
     socket.on('player-joined', (gameState) => {
-      announceToScreenReader('Tu amigo se ha unido a la sala. Ahora establece la palabra', 'polite');
-      setMultiplayerGameState(gameState);
-      setCurrentScreen('multiplayer-game');
+      // Solo el host debe ir a la pantalla de juego para establecer la palabra
+      if (multiplayerRole === 'host') {
+        announceToScreenReader('Tu amigo se ha unido a la sala. Ahora establece la palabra', 'polite');
+        setMultiplayerGameState(gameState);
+        setCurrentScreen('multiplayer-game');
+      }
     });
 
     // Cuando el juego comienza
