@@ -121,28 +121,23 @@ class GameRoom {
     this.currentRound++;
   }
 
-  checkWinner() {
-    // Necesitamos al menos 2 resultados (una ronda completa = ambos jugadores jugaron)
-    if (this.roundResults.length < 2) {
-      return null;
-    }
-
-    // Verificar que los dos últimos resultados sean de la misma ronda completa
-    // Una ronda completa significa que ambos jugadores han tenido su turno
-    const lastTwo = this.roundResults.slice(-2);
+  checkWinner(currentRoundNumber) {
+    // Obtener los resultados de la ronda actual
+    const currentRoundResults = this.roundResults.filter(r => r.round === currentRoundNumber);
     
-    // Verificar que sean turnos complementarios (uno como host setter, otro como guest setter)
-    const hasHostSetter = lastTwo.some(r => r.setter === 'host');
-    const hasGuestSetter = lastTwo.some(r => r.setter === 'guest');
-    
-    // Si no tenemos ambos roles, la ronda no está completa
-    if (!hasHostSetter || !hasGuestSetter) {
+    // Necesitamos exactamente 2 resultados (ambos jugadores jugaron)
+    if (currentRoundResults.length !== 2) {
       return null;
     }
 
     // Identificar los resultados por jugador
-    const hostResult = lastTwo.find(r => r.guesser === 'host');
-    const guestResult = lastTwo.find(r => r.guesser === 'guest');
+    const hostResult = currentRoundResults.find(r => r.guesser === 'host');
+    const guestResult = currentRoundResults.find(r => r.guesser === 'guest');
+
+    // Verificar que tengamos ambos resultados
+    if (!hostResult || !guestResult) {
+      return null;
+    }
 
     // Si uno ganó y otro perdió
     if (hostResult.won && !guestResult.won) {
@@ -315,14 +310,13 @@ io.on('connection', (socket) => {
       }
 
       // Verificar si la ronda completa ha terminado (ambos jugadores han jugado)
-      // Una ronda completa = 2 turnos (uno con host como setter, otro con guest como setter)
-      const hasHostSetter = room.roundResults.filter(r => r.round === room.currentRound && r.setter === 'host').length > 0;
-      const hasGuestSetter = room.roundResults.filter(r => r.round === room.currentRound && r.setter === 'guest').length > 0;
-      const roundComplete = hasHostSetter && hasGuestSetter;
+      // Contar cuántos resultados hay en la ronda actual
+      const currentRoundResults = room.roundResults.filter(r => r.round === room.currentRound);
+      const roundComplete = currentRoundResults.length === 2;
 
       if (roundComplete) {
         // La ronda completa ha terminado, verificar si hay un ganador definitivo
-        const winner = room.checkWinner();
+        const winner = room.checkWinner(room.currentRound);
         
         if (winner) {
           // Hay un ganador definitivo - emitir inmediatamente
