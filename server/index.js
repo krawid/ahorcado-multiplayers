@@ -65,6 +65,7 @@ class GameRoom {
     };
     this.turnResults = []; // Historial de resultados por turno
     this.createdAt = Date.now();
+    this.hostDisconnectedAt = null; // Timestamp de desconexión del host
   }
 
   addGuest(guestId) {
@@ -415,26 +416,48 @@ io.on('connection', (socket) => {
     
     for (const [roomCode, room] of rooms.entries()) {
       if (room.hostId === socket.id || room.guestId === socket.id) {
-        io.to(roomCode).emit('player-disconnected');
-        rooms.delete(roomCode);
-        console.log(`Sala ${roomCode} eliminada`);
+        const isHost = room.hostId === socket.id;
+        const hasGuest = room.guestId !== null;
+        
+        // Si el host se desconecta y NO hay invitado aún, dar tiempo de gracia de 2 minutos
+        if (isHost && !hasGuest) {
+          console.log(`Host desconectado de sala ${roomCode}, esperando 2 minutos antes de eliminar`);
+          room.hostDisconnectedAt = Date.now();
+          // No eliminar inmediatamente, el timeout lo hará si no se reconecta
+        } else {
+          // Si hay invitado o es el invitado quien se desconecta, eliminar inmediatamente
+          io.to(roomCode).emit('player-disconnected');
+          rooms.delete(roomCode);
+          console.log(`Sala ${roomCode} eliminada por desconexión`);
+        }
       }
     }
   });
 });
 
-// Limpiar salas viejas cada 30 minutos
+// Limpiar salas viejas cada minuto
 setInterval(() => {
   const now = Date.now();
-  const maxAge = 30 * 60 * 1000;
+  const maxAge = 30 * 60 * 1000; // 30 minutos
+  const graceTime = 2 * 60 * 1000; // 2 minutos de gracia para reconexión
   
   for (const [roomCode, room] of rooms.entries()) {
+    // Eliminar salas muy viejas (30 minutos)
     if (now - room.createdAt > maxAge) {
       rooms.delete(roomCode);
-      console.log(`Sala ${roomCode} eliminada por inactividad`);
+      console.log(`Sala ${roomCode} eliminada por inactividad (30 min)`);
+      continue;
+    }
+    
+    // Eliminar salas donde el host se desconectó hace más de 2 minutos sin invitado
+    if (room.hostDisconnectedAt && !room.guestId) {
+      if (now - room.hostDisconnectedAt > graceTime) {
+        rooms.delete(roomCode);
+        console.log(`Sala ${roomCode} eliminada después de tiempo de gracia (2 min)`);
+      }
     }
   }
-}, 30 * 60 * 1000);
+}, 60 * 1000); // Ejecutar cada minuto
 
 // Todas las demás rutas sirven el frontend (debe ir al final)
 app.get('*', (req, res) => {
