@@ -51,6 +51,14 @@ class GameRoom {
       gameOver: false,
       won: false
     };
+    // Sistema de turnos y puntuación
+    this.currentRound = 1;
+    this.currentSetter = 'host'; // 'host' o 'guest' - quien pone la palabra
+    this.scores = {
+      host: 0,
+      guest: 0
+    };
+    this.roundResults = []; // Historial de resultados por ronda
     this.createdAt = Date.now();
   }
 
@@ -107,6 +115,36 @@ class GameRoom {
       .join(' ');
   }
 
+  switchRoles() {
+    this.currentSetter = this.currentSetter === 'host' ? 'guest' : 'host';
+    this.currentRound++;
+  }
+
+  checkWinner() {
+    // Si solo hay una ronda, no hay ganador aún
+    if (this.roundResults.length < 2) {
+      return null;
+    }
+
+    // Obtener los dos últimos resultados (las dos últimas rondas)
+    const lastTwo = this.roundResults.slice(-2);
+    
+    // Identificar quién adivinó en cada ronda
+    const round1 = lastTwo[0]; // { setter: 'host', guesser: 'guest', won: true/false }
+    const round2 = lastTwo[1]; // { setter: 'guest', guesser: 'host', won: true/false }
+
+    // Si uno ganó y otro perdió
+    if (round1.won && !round2.won) {
+      return round1.guesser; // El que adivinó correctamente en la primera ronda
+    }
+    if (!round1.won && round2.won) {
+      return round2.guesser; // El que adivinó correctamente en la segunda ronda
+    }
+
+    // Si ambos ganaron o ambos perdieron, continuar jugando
+    return null;
+  }
+
   getPublicState() {
     return {
       roomCode: this.roomCode,
@@ -117,7 +155,11 @@ class GameRoom {
       gameOver: this.gameState.gameOver,
       won: this.gameState.won,
       word: this.gameState.gameOver ? this.gameState.word : null,
-      playersReady: this.isReady()
+      playersReady: this.isReady(),
+      currentRound: this.currentRound,
+      currentSetter: this.currentSetter,
+      scores: this.scores,
+      roundResults: this.roundResults
     };
   }
 }
@@ -214,7 +256,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Nueva partida
+  // Nueva partida (siguiente ronda)
   socket.on('new-game', (roomCode) => {
     const room = rooms.get(roomCode);
     
@@ -222,6 +264,37 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Guardar resultado de la ronda anterior
+    const guesser = room.currentSetter === 'host' ? 'guest' : 'host';
+    room.roundResults.push({
+      round: room.currentRound,
+      setter: room.currentSetter,
+      guesser: guesser,
+      won: room.gameState.won
+    });
+
+    // Actualizar puntuación
+    if (room.gameState.won) {
+      room.scores[guesser]++;
+    }
+
+    // Verificar si hay un ganador definitivo
+    const winner = room.checkWinner();
+    
+    if (winner) {
+      // Hay un ganador definitivo
+      io.to(roomCode).emit('match-winner', {
+        winner: winner,
+        scores: room.scores,
+        roundResults: room.roundResults
+      });
+      return;
+    }
+
+    // Cambiar roles para la siguiente ronda
+    room.switchRoles();
+
+    // Resetear estado del juego
     room.gameState = {
       word: '',
       guessedLetters: [],

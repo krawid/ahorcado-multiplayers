@@ -22,24 +22,34 @@ export default function MultiplayerGameScreen({
   const letterInputRef = useRef(null);
   const wordInputRef = useRef(null);
 
-  // Enfocar input correspondiente al montar
+  // Determinar si soy el que establece la palabra en esta ronda
+  const iAmSetter = (role === 'host' && gameState.currentSetter === 'host') ||
+                    (role === 'guest' && gameState.currentSetter === 'guest');
+  const iAmGuesser = !iAmSetter;
+
+  // Resetear wordSet cuando cambia la ronda
   useEffect(() => {
-    if (role === 'host' && !wordSet && wordInputRef.current) {
+    setWordSet(false);
+    setWordInput('');
+    setLetterInput('');
+  }, [gameState.currentRound]);
+
+  // Enfocar input correspondiente al montar o cuando cambia el rol
+  useEffect(() => {
+    if (iAmSetter && !wordSet && wordInputRef.current) {
       wordInputRef.current.focus();
-    } else if (role === 'guest' && letterInputRef.current) {
+    } else if (iAmGuesser && letterInputRef.current && gameState.displayWord) {
       letterInputRef.current.focus();
     }
-  }, [role, wordSet]);
+  }, [iAmSetter, iAmGuesser, wordSet, gameState.displayWord]);
 
   // Anunciar cuando el juego comienza
   useEffect(() => {
-    if (gameState.displayWord && !gameState.gameOver) {
-      if (role === 'guest') {
-        const wordLength = gameState.displayWord.replace(/ /g, '').length;
-        announceToScreenReader(`La palabra tiene ${wordLength} letras`, 'polite');
-      }
+    if (gameState.displayWord && !gameState.gameOver && iAmGuesser) {
+      const wordLength = gameState.displayWord.replace(/ /g, '').length;
+      announceToScreenReader(`La palabra tiene ${wordLength} letras`, 'polite');
     }
-  }, [gameState.displayWord, role]);
+  }, [gameState.displayWord, gameState.gameOver, iAmGuesser]);
 
   const handleSetWord = (e) => {
     e.preventDefault();
@@ -100,14 +110,59 @@ export default function MultiplayerGameScreen({
     }
   };
 
-  // Vista del host: establecer palabra o espectador
-  if (role === 'host') {
+  // Si hay un ganador definitivo de la partida
+  if (gameState.matchOver) {
+    const iWon = (role === gameState.matchWinner);
+    
+    return (
+      <main className="multiplayer-game-screen">
+        <div className="room-header">
+          <h1>Partida Finalizada</h1>
+        </div>
+
+        <div className="match-over-info">
+          <h2>{iWon ? '¡Felicidades! Ganaste la partida' : 'Perdiste la partida'}</h2>
+          
+          <div className="scores">
+            <h3>Puntuación Final</h3>
+            <p>Tú: {gameState.scores[role]} - Rival: {gameState.scores[role === 'host' ? 'guest' : 'host']}</p>
+          </div>
+
+          <div className="round-history">
+            <h3>Historial de Rondas</h3>
+            {gameState.roundResults && gameState.roundResults.map((result, index) => {
+              const wasIGuesser = (role === 'host' && result.guesser === 'host') ||
+                                  (role === 'guest' && result.guesser === 'guest');
+              return (
+                <p key={index}>
+                  Ronda {result.round}: {wasIGuesser ? 'Tú adivinaste' : 'Tu rival adivinó'} - {result.won ? '✓ Ganó' : '✗ Perdió'}
+                </p>
+              );
+            })}
+          </div>
+
+          <div className="game-over-buttons">
+            <button className="btn btn-primary" onClick={onExit}>
+              Volver al Inicio
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Vista del que establece la palabra
+  if (iAmSetter) {
     if (!wordSet) {
       return (
         <main className="multiplayer-game-screen">
           <div className="room-header">
             <h1>Sala: {roomCode}</h1>
-            <p>Eres el anfitrión</p>
+            <p>Ronda {gameState.currentRound} - Tú estableces la palabra</p>
+          </div>
+
+          <div className="scores-display">
+            <p>Tú: {gameState.scores[role]} - Rival: {gameState.scores[role === 'host' ? 'guest' : 'host']}</p>
           </div>
 
           <div className="set-word-container">
@@ -140,12 +195,16 @@ export default function MultiplayerGameScreen({
       );
     }
 
-    // Host observando el juego
+    // Observando el juego (establecí la palabra)
     return (
       <main className="multiplayer-game-screen">
         <div className="room-header">
           <h1>Sala: {roomCode}</h1>
-          <p>Eres el anfitrión - Observando</p>
+          <p>Ronda {gameState.currentRound} - Observando</p>
+        </div>
+
+        <div className="scores-display">
+          <p>Tú: {gameState.scores[role]} - Rival: {gameState.scores[role === 'host' ? 'guest' : 'host']}</p>
         </div>
 
         <div className="game-info">
@@ -182,12 +241,12 @@ export default function MultiplayerGameScreen({
 
         {gameState.gameOver && (
           <div className="game-over-info">
-            <h2>{gameState.won ? '¡Tu amigo ganó!' : 'Tu amigo perdió'}</h2>
+            <h2>{gameState.won ? '¡Tu rival ganó esta ronda!' : 'Tu rival perdió esta ronda'}</h2>
             <p>La palabra era: <strong>{gameState.word}</strong></p>
             
             <div className="game-over-buttons">
               <button className="btn btn-primary" onClick={handleNewGame}>
-                Nueva Partida
+                Siguiente Ronda
               </button>
               <button className="btn btn-secondary" onClick={handleExit}>
                 Salir
@@ -205,18 +264,22 @@ export default function MultiplayerGameScreen({
     );
   }
 
-  // Vista del invitado: adivinar
+  // Vista del que adivina
   return (
     <main className="multiplayer-game-screen">
       <div className="room-header">
         <h1>Sala: {roomCode}</h1>
-        <p>Eres el invitado - Adivinando</p>
+        <p>Ronda {gameState.currentRound} - Tú adivinas</p>
+      </div>
+
+      <div className="scores-display">
+        <p>Tú: {gameState.scores[role]} - Rival: {gameState.scores[role === 'host' ? 'guest' : 'host']}</p>
       </div>
 
       {!gameState.displayWord ? (
         <div className="waiting-word">
           <div className="spinner"></div>
-          <p>Esperando a que el anfitrión establezca la palabra...</p>
+          <p>Esperando a que tu rival establezca la palabra...</p>
         </div>
       ) : (
         <>
@@ -288,12 +351,12 @@ export default function MultiplayerGameScreen({
 
           {gameState.gameOver && (
             <div className="game-over-info">
-              <h2>{gameState.won ? '¡Felicidades! Ganaste' : 'Perdiste'}</h2>
+              <h2>{gameState.won ? '¡Ganaste esta ronda!' : 'Perdiste esta ronda'}</h2>
               <p>La palabra era: <strong>{gameState.word}</strong></p>
               
               <div className="game-over-buttons">
                 <button className="btn btn-primary" onClick={handleNewGame}>
-                  Jugar de Nuevo
+                  Siguiente Ronda
                 </button>
                 <button className="btn btn-secondary" onClick={handleExit}>
                   Salir

@@ -114,11 +114,35 @@ function App() {
       }
     });
 
-    // Cuando el juego se reinicia
+    // Cuando el juego se reinicia (nueva ronda)
     socket.on('game-reset', (gameState) => {
       setMultiplayerGameState(gameState);
-      setCurrentScreen('multiplayer-waiting');
-      announceToScreenReader('Nueva partida. Esperando a que el host establezca la palabra', 'polite');
+      
+      // Determinar quién establece la palabra en esta ronda
+      const iAmSetter = (multiplayerRole === 'host' && gameState.currentSetter === 'host') ||
+                        (multiplayerRole === 'guest' && gameState.currentSetter === 'guest');
+      
+      if (iAmSetter) {
+        announceToScreenReader(`Ronda ${gameState.currentRound}. Ahora tú estableces la palabra`, 'polite');
+      } else {
+        announceToScreenReader(`Ronda ${gameState.currentRound}. Esperando a que tu amigo establezca la palabra`, 'polite');
+      }
+      
+      setCurrentScreen('multiplayer-game');
+    });
+
+    // Cuando hay un ganador definitivo
+    socket.on('match-winner', ({ winner, scores, roundResults }) => {
+      const iWon = (multiplayerRole === winner);
+      announceToScreenReader(iWon ? '¡Has ganado la partida!' : 'Has perdido la partida', 'assertive');
+      
+      setMultiplayerGameState(prev => ({
+        ...prev,
+        matchOver: true,
+        matchWinner: winner,
+        scores: scores,
+        roundResults: roundResults
+      }));
     });
 
     // Cuando un jugador se desconecta
@@ -132,6 +156,7 @@ function App() {
       socket.off('game-started');
       socket.off('guess-result');
       socket.off('game-reset');
+      socket.off('match-winner');
       socket.off('player-disconnected');
     };
   }, [multiplayerRoom]);
