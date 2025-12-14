@@ -142,7 +142,7 @@ export default function MultiplayerGameScreen({
                                   (role === 'guest' && result.guesser === 'guest');
               return (
                 <p key={index}>
-                  Ronda {result.round}: {wasIGuesser ? 'Tú adivinaste' : 'Tu rival adivinó'} - {result.won ? '✓ Ganó' : '✗ Perdió'}
+                  Ronda {result.round}: {wasIGuesser ? 'Tú adivinaste' : 'Tu rival adivinó'} - {result.won ? `✓ Ganó (${result.attemptsUsed} intentos)` : '✗ Perdió'}
                 </p>
               );
             })}

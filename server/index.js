@@ -74,6 +74,7 @@ class GameRoom {
     this.gameState.word = word.toUpperCase();
     this.gameState.guessedLetters = [];
     this.gameState.attemptsLeft = this.settings.maxAttempts || 6;
+    this.gameState.maxAttempts = this.settings.maxAttempts || 6;
     this.gameState.gameOver = false;
     this.gameState.won = false;
   }
@@ -130,8 +131,8 @@ class GameRoom {
     const lastTwo = this.roundResults.slice(-2);
     
     // Identificar quién adivinó en cada ronda
-    const round1 = lastTwo[0]; // { setter: 'host', guesser: 'guest', won: true/false }
-    const round2 = lastTwo[1]; // { setter: 'guest', guesser: 'host', won: true/false }
+    const round1 = lastTwo[0]; // { setter: 'host', guesser: 'guest', won: true/false, attemptsUsed: number }
+    const round2 = lastTwo[1]; // { setter: 'guest', guesser: 'host', won: true/false, attemptsUsed: number }
 
     // Si uno ganó y otro perdió
     if (round1.won && !round2.won) {
@@ -141,7 +142,18 @@ class GameRoom {
       return round2.guesser; // El que adivinó correctamente en la segunda ronda
     }
 
-    // Si ambos ganaron o ambos perdieron, continuar jugando
+    // Si ambos ganaron, gana quien usó menos intentos
+    if (round1.won && round2.won) {
+      if (round1.attemptsUsed < round2.attemptsUsed) {
+        return round1.guesser;
+      } else if (round2.attemptsUsed < round1.attemptsUsed) {
+        return round2.guesser;
+      }
+      // Si usaron los mismos intentos, continuar jugando
+      return null;
+    }
+
+    // Si ambos perdieron, continuar jugando
     return null;
   }
 
@@ -225,26 +237,43 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Host establece la palabra
+  // Establecer la palabra (puede ser host o guest según la ronda)
   socket.on('set-word', (roomCode, word) => {
     const room = rooms.get(roomCode);
     
-    if (!room || room.hostId !== socket.id) {
+    if (!room) {
+      return;
+    }
+
+    // Verificar que quien envía es el setter actual
+    const isCurrentSetter = (room.currentSetter === 'host' && socket.id === room.hostId) ||
+                            (room.currentSetter === 'guest' && socket.id === room.guestId);
+    
+    if (!isCurrentSetter) {
+      console.log(`${socket.id} intentó establecer palabra pero no es el setter actual`);
       return;
     }
 
     room.startGame(word);
     
-    console.log(`Palabra establecida en sala ${roomCode}`);
+    console.log(`Palabra establecida en sala ${roomCode} por ${room.currentSetter}`);
     
     io.to(roomCode).emit('game-started', room.getPublicState());
   });
 
-  // Adivinar letra
+  // Adivinar letra (puede ser host o guest según la ronda)
   socket.on('guess-letter', (roomCode, letter) => {
     const room = rooms.get(roomCode);
     
-    if (!room || room.guestId !== socket.id) {
+    if (!room) {
+      return;
+    }
+
+    // Verificar que quien envía es el guesser actual (el que NO es el setter)
+    const isCurrentGuesser = (room.currentSetter === 'host' && socket.id === room.guestId) ||
+                             (room.currentSetter === 'guest' && socket.id === room.hostId);
+    
+    if (!isCurrentGuesser) {
       return;
     }
 
@@ -267,11 +296,14 @@ io.on('connection', (socket) => {
 
     // Guardar resultado de la ronda anterior
     const guesser = room.currentSetter === 'host' ? 'guest' : 'host';
+    const attemptsUsed = room.gameState.maxAttempts - room.gameState.attemptsLeft;
+    
     room.roundResults.push({
       round: room.currentRound,
       setter: room.currentSetter,
       guesser: guesser,
-      won: room.gameState.won
+      won: room.gameState.won,
+      attemptsUsed: attemptsUsed
     });
 
     // Actualizar puntuación
