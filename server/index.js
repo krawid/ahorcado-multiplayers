@@ -57,12 +57,13 @@ class GameRoom {
     };
     // Sistema de turnos y puntuación
     this.currentRound = 1;
+    this.currentTurn = 1; // 1 o 2 - turno dentro de la ronda actual
     this.currentSetter = 'host'; // 'host' o 'guest' - quien pone la palabra
     this.scores = {
       host: 0,
       guest: 0
     };
-    this.roundResults = []; // Historial de resultados por ronda
+    this.turnResults = []; // Historial de resultados por turno
     this.createdAt = Date.now();
   }
 
@@ -122,21 +123,26 @@ class GameRoom {
 
   switchRoles() {
     this.currentSetter = this.currentSetter === 'host' ? 'guest' : 'host';
+    // NO incrementar currentRound aquí - se incrementa solo después de una ronda completa
+  }
+
+  startNewRound() {
     this.currentRound++;
+    this.currentSetter = 'host'; // Siempre empieza el host en cada ronda
   }
 
   checkWinner(currentRoundNumber) {
-    // Obtener los resultados de la ronda actual
-    const currentRoundResults = this.roundResults.filter(r => r.round === currentRoundNumber);
+    // Obtener los resultados de la ronda actual (2 turnos)
+    const currentRoundTurns = this.turnResults.filter(r => r.round === currentRoundNumber);
     
-    // Necesitamos exactamente 2 resultados (ambos jugadores jugaron)
-    if (currentRoundResults.length !== 2) {
+    // Necesitamos exactamente 2 turnos (ambos jugadores jugaron)
+    if (currentRoundTurns.length !== 2) {
       return null;
     }
 
     // Identificar los resultados por jugador
-    const hostResult = currentRoundResults.find(r => r.guesser === 'host');
-    const guestResult = currentRoundResults.find(r => r.guesser === 'guest');
+    const hostResult = currentRoundTurns.find(r => r.guesser === 'host');
+    const guestResult = currentRoundTurns.find(r => r.guesser === 'guest');
 
     // Verificar que tengamos ambos resultados
     if (!hostResult || !guestResult) {
@@ -158,11 +164,11 @@ class GameRoom {
       } else if (guestResult.attemptsUsed < hostResult.attemptsUsed) {
         return 'guest';
       }
-      // Si usaron los mismos intentos, continuar jugando
+      // Si usaron los mismos intentos, continuar jugando (nueva ronda)
       return null;
     }
 
-    // Si ambos perdieron, continuar jugando
+    // Si ambos perdieron, continuar jugando (nueva ronda)
     return null;
   }
 
@@ -178,9 +184,10 @@ class GameRoom {
       word: this.gameState.gameOver ? this.gameState.word : null,
       playersReady: this.isReady(),
       currentRound: this.currentRound,
+      currentTurn: this.currentTurn,
       currentSetter: this.currentSetter,
       scores: this.scores,
-      roundResults: this.roundResults
+      roundResults: this.turnResults // Mantener nombre para compatibilidad con frontend
     };
   }
 }
@@ -305,8 +312,9 @@ io.on('connection', (socket) => {
       const guesser = room.currentSetter === 'host' ? 'guest' : 'host';
       const attemptsUsed = room.gameState.maxAttempts - room.gameState.attemptsLeft;
       
-      room.roundResults.push({
+      room.turnResults.push({
         round: room.currentRound,
+        turn: room.currentTurn,
         setter: room.currentSetter,
         guesser: guesser,
         won: room.gameState.won,
@@ -318,10 +326,9 @@ io.on('connection', (socket) => {
         room.scores[guesser]++;
       }
 
-      // Verificar si la ronda completa ha terminado (ambos jugadores han jugado)
-      // Contar cuántos resultados hay en la ronda actual
-      const currentRoundResults = room.roundResults.filter(r => r.round === room.currentRound);
-      const roundComplete = currentRoundResults.length === 2;
+      // Verificar si la ronda completa ha terminado (2 turnos completados)
+      const currentRoundTurns = room.turnResults.filter(r => r.round === room.currentRound);
+      const roundComplete = currentRoundTurns.length === 2;
 
       if (roundComplete) {
         // La ronda completa ha terminado, verificar si hay un ganador definitivo
@@ -333,15 +340,16 @@ io.on('connection', (socket) => {
             io.to(roomCode).emit('match-winner', {
               winner: winner,
               scores: room.scores,
-              roundResults: room.roundResults
+              roundResults: room.turnResults
             });
           }, 2000); // Esperar 2 segundos para que se escuchen los sonidos de turno
         } else {
-          // No hay ganador aún - iniciar nueva ronda (cambiar roles)
+          // No hay ganador aún - iniciar nueva ronda
           setTimeout(() => {
-            room.switchRoles();
+            room.startNewRound(); // Incrementa currentRound y resetea a host
 
             // Resetear estado del juego
+            room.currentTurn = 1;
             room.gameState = {
               word: '',
               guessedLetters: [],
@@ -355,9 +363,10 @@ io.on('connection', (socket) => {
           }, 2000); // Esperar 2 segundos para que se escuchen los sonidos de turno
         }
       } else {
-        // La ronda no está completa, cambiar roles para que juegue el otro
+        // Turno 1 completado, pasar al turno 2 de la misma ronda
         setTimeout(() => {
-          room.switchRoles();
+          room.switchRoles(); // Cambiar de host a guest o viceversa
+          room.currentTurn = 2;
 
           // Resetear estado del juego para el siguiente turno
           room.gameState = {
