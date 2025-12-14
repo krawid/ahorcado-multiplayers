@@ -68,7 +68,19 @@ function App() {
 
     // Cuando el invitado se une
     socket.on('player-joined', () => {
-      announceToScreenReader('Tu amigo se ha unido a la sala', 'polite');
+      announceToScreenReader('Tu amigo se ha unido a la sala. Ahora establece la palabra', 'polite');
+      // Inicializar estado de juego vacío para que el host pueda establecer la palabra
+      setMultiplayerGameState({
+        displayWord: '',
+        guessedLetters: [],
+        attemptsLeft: 0,
+        maxAttempts: 0,
+        gameOver: false,
+        won: false,
+        word: null,
+        playersReady: true
+      });
+      setCurrentScreen('multiplayer-game');
     });
 
     // Cuando el juego comienza
