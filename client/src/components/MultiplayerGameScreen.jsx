@@ -23,16 +23,23 @@ export default function MultiplayerGameScreen({
   const wordInputRef = useRef(null);
 
   // Determinar si soy el que establece la palabra en esta ronda
-  const iAmSetter = (role === 'host' && gameState.currentSetter === 'host') ||
-                    (role === 'guest' && gameState.currentSetter === 'guest');
+  // Por defecto, el host es el que establece la palabra en la primera ronda
+  const currentSetter = gameState.currentSetter || 'host';
+  const iAmSetter = (role === 'host' && currentSetter === 'host') ||
+                    (role === 'guest' && currentSetter === 'guest');
   const iAmGuesser = !iAmSetter;
+
+  // Scores con valores por defecto
+  const scores = gameState.scores || { host: 0, guest: 0 };
+  const myScore = scores[role] || 0;
+  const rivalScore = scores[role === 'host' ? 'guest' : 'host'] || 0;
 
   // Resetear wordSet cuando cambia la ronda
   useEffect(() => {
     setWordSet(false);
     setWordInput('');
     setLetterInput('');
-  }, [gameState.currentRound]);
+  }, [gameState.currentRound || 1]);
 
   // Enfocar input correspondiente al montar o cuando cambia el rol
   useEffect(() => {
@@ -125,7 +132,7 @@ export default function MultiplayerGameScreen({
           
           <div className="scores">
             <h3>Puntuación Final</h3>
-            <p>Tú: {gameState.scores[role]} - Rival: {gameState.scores[role === 'host' ? 'guest' : 'host']}</p>
+            <p>Tú: {myScore} - Rival: {rivalScore}</p>
           </div>
 
           <div className="round-history">
@@ -158,11 +165,11 @@ export default function MultiplayerGameScreen({
         <main className="multiplayer-game-screen">
           <div className="room-header">
             <h1>Sala: {roomCode}</h1>
-            <p>Ronda {gameState.currentRound} - Tú estableces la palabra</p>
+            <p>Ronda {gameState.currentRound || 1} - Tú estableces la palabra</p>
           </div>
 
           <div className="scores-display">
-            <p>Tú: {gameState.scores[role]} - Rival: {gameState.scores[role === 'host' ? 'guest' : 'host']}</p>
+            <p>Tú: {myScore} - Rival: {rivalScore}</p>
           </div>
 
           <div className="set-word-container">
@@ -200,11 +207,11 @@ export default function MultiplayerGameScreen({
       <main className="multiplayer-game-screen">
         <div className="room-header">
           <h1>Sala: {roomCode}</h1>
-          <p>Ronda {gameState.currentRound} - Observando</p>
+          <p>Ronda {gameState.currentRound || 1} - Observando</p>
         </div>
 
         <div className="scores-display">
-          <p>Tú: {gameState.scores[role]} - Rival: {gameState.scores[role === 'host' ? 'guest' : 'host']}</p>
+          <p>Tú: {myScore} - Rival: {rivalScore}</p>
         </div>
 
         <div className="game-info">
@@ -269,11 +276,11 @@ export default function MultiplayerGameScreen({
     <main className="multiplayer-game-screen">
       <div className="room-header">
         <h1>Sala: {roomCode}</h1>
-        <p>Ronda {gameState.currentRound} - Tú adivinas</p>
+        <p>Ronda {gameState.currentRound || 1} - Tú adivinas</p>
       </div>
 
       <div className="scores-display">
-        <p>Tú: {gameState.scores[role]} - Rival: {gameState.scores[role === 'host' ? 'guest' : 'host']}</p>
+        <p>Tú: {myScore} - Rival: {rivalScore}</p>
       </div>
 
       {!gameState.displayWord ? (

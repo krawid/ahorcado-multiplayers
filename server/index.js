@@ -213,15 +213,16 @@ io.on('connection', (socket) => {
     
     console.log(`${socket.id} se unió a sala ${roomCode}`);
     
-    io.to(room.hostId).emit('player-joined');
+    const publicState = room.getPublicState();
+    
+    // Notificar al host que el invitado se unió
+    io.to(room.hostId).emit('player-joined', publicState);
     
     callback({ 
       success: true, 
       roomCode,
       role: 'guest'
     });
-
-    io.to(roomCode).emit('game-state', room.getPublicState());
   });
 
   // Host establece la palabra
