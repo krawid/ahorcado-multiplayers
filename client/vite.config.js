@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/ahorcado-pwa/', // Cambia esto si tu repo tiene otro nombre
+  base: '/', // Para Railway/producción
   test: {
     globals: true,
     environment: 'jsdom',
