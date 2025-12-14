@@ -284,50 +284,72 @@ io.on('connection', (socket) => {
       correct: result.correct,
       gameState: room.getPublicState()
     });
+
+    // Si la ronda terminó, verificar automáticamente si hay un ganador de la partida
+    if (room.gameState.gameOver) {
+      // Guardar resultado de la ronda
+      const guesser = room.currentSetter === 'host' ? 'guest' : 'host';
+      const attemptsUsed = room.gameState.maxAttempts - room.gameState.attemptsLeft;
+      
+      room.roundResults.push({
+        round: room.currentRound,
+        setter: room.currentSetter,
+        guesser: guesser,
+        won: room.gameState.won,
+        attemptsUsed: attemptsUsed
+      });
+
+      // Actualizar puntuación
+      if (room.gameState.won) {
+        room.scores[guesser]++;
+      }
+
+      // Verificar si hay un ganador definitivo
+      const winner = room.checkWinner();
+      
+      if (winner) {
+        // Hay un ganador definitivo - emitir inmediatamente
+        setTimeout(() => {
+          io.to(roomCode).emit('match-winner', {
+            winner: winner,
+            scores: room.scores,
+            roundResults: room.roundResults
+          });
+        }, 2000); // Esperar 2 segundos para que se escuchen los sonidos de ronda
+      } else {
+        // No hay ganador aún - cambiar roles para la siguiente ronda
+        setTimeout(() => {
+          room.switchRoles();
+
+          // Resetear estado del juego
+          room.gameState = {
+            word: '',
+            guessedLetters: [],
+            attemptsLeft: room.settings.maxAttempts || 6,
+            maxAttempts: room.settings.maxAttempts || 6,
+            gameOver: false,
+            won: false
+          };
+
+          io.to(roomCode).emit('game-reset', room.getPublicState());
+        }, 2000); // Esperar 2 segundos para que se escuchen los sonidos de ronda
+      }
+    }
   });
 
-  // Nueva partida (siguiente ronda)
-  socket.on('new-game', (roomCode) => {
+  // Nueva partida completa (reiniciar todo desde cero)
+  socket.on('new-match', (roomCode) => {
     const room = rooms.get(roomCode);
     
     if (!room) {
       return;
     }
 
-    // Guardar resultado de la ronda anterior
-    const guesser = room.currentSetter === 'host' ? 'guest' : 'host';
-    const attemptsUsed = room.gameState.maxAttempts - room.gameState.attemptsLeft;
-    
-    room.roundResults.push({
-      round: room.currentRound,
-      setter: room.currentSetter,
-      guesser: guesser,
-      won: room.gameState.won,
-      attemptsUsed: attemptsUsed
-    });
-
-    // Actualizar puntuación
-    if (room.gameState.won) {
-      room.scores[guesser]++;
-    }
-
-    // Verificar si hay un ganador definitivo
-    const winner = room.checkWinner();
-    
-    if (winner) {
-      // Hay un ganador definitivo
-      io.to(roomCode).emit('match-winner', {
-        winner: winner,
-        scores: room.scores,
-        roundResults: room.roundResults
-      });
-      return;
-    }
-
-    // Cambiar roles para la siguiente ronda
-    room.switchRoles();
-
-    // Resetear estado del juego
+    // Resetear todo
+    room.currentRound = 1;
+    room.currentSetter = 'host';
+    room.scores = { host: 0, guest: 0 };
+    room.roundResults = [];
     room.gameState = {
       word: '',
       guessedLetters: [],
@@ -337,7 +359,7 @@ io.on('connection', (socket) => {
       won: false
     };
 
-    io.to(roomCode).emit('game-reset', room.getPublicState());
+    io.to(roomCode).emit('match-reset', room.getPublicState());
   });
 
   // Desconexión

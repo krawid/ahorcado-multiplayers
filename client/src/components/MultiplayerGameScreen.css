@@ -201,6 +201,21 @@
   color: var(--text-secondary);
 }
 
+/* Esperando siguiente ronda */
+.waiting-next-round {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.waiting-next-round p {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+}
+
 /* Puntuación */
 .scores-display {
   text-align: center;

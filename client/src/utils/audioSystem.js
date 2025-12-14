@@ -3,8 +3,9 @@
  * Genera tonos sintetizados con armónicos para feedback del juego
  */
 
-// Importar archivo de aplausos
+// Importar archivos de audio
 import applauseSound from '../assets/sounds/applause.mp3';
+import booSound from '../assets/sounds/abucheo.mp3';
 
 /**
  * Clase que gestiona la generación y reproducción de audio
@@ -194,11 +195,39 @@ export class AudioSystem {
   }
 
   /**
-   * Reproduce sonido de victoria (melodía triunfante o archivo de aplausos)
+   * Reproduce sonido de victoria en una ronda (melodía corta alegre)
    * @returns {Promise<void>}
    */
-  async playWinSound() {
-    // Intentar reproducir archivo de aplausos primero
+  async playRoundWinSound() {
+    // Melodía corta ascendente alegre (Do - Mi - Sol)
+    const frequencies = [
+      523.25, // C5
+      659.25, // E5
+      783.99  // G5
+    ];
+    await this.generateMelody(frequencies, 0.2, 0.3);
+  }
+
+  /**
+   * Reproduce sonido de derrota en una ronda (melodía corta triste)
+   * @returns {Promise<void>}
+   */
+  async playRoundLoseSound() {
+    // Melodía corta descendente triste (Sol - Mi - Do)
+    const frequencies = [
+      783.99, // G5
+      659.25, // E5
+      523.25  // C5
+    ];
+    await this.generateMelody(frequencies, 0.25, 0.3);
+  }
+
+  /**
+   * Reproduce sonido de victoria de la partida completa (aplausos)
+   * @returns {Promise<void>}
+   */
+  async playMatchWinSound() {
+    // Reproducir archivo de aplausos
     try {
       await this.playAudioFile(applauseSound, 0.5);
     } catch (error) {
@@ -215,18 +244,40 @@ export class AudioSystem {
   }
 
   /**
-   * Reproduce sonido de derrota (melodía triste)
+   * Reproduce sonido de derrota de la partida completa (abucheo)
+   * @returns {Promise<void>}
+   */
+  async playMatchLoseSound() {
+    // Reproducir archivo de abucheo
+    try {
+      await this.playAudioFile(booSound, 0.5);
+    } catch (error) {
+      // Si falla, usar melodía sintetizada como fallback
+      console.log('Usando sonido sintetizado como fallback');
+      const frequencies = [
+        523.25, // C5
+        440.00, // A4
+        349.23, // F4
+        293.66  // D4
+      ];
+      await this.generateMelody(frequencies, 0.25, 0.3);
+    }
+  }
+
+  /**
+   * Reproduce sonido de victoria (para modo individual - mantener compatibilidad)
+   * @returns {Promise<void>}
+   */
+  async playWinSound() {
+    await this.playMatchWinSound();
+  }
+
+  /**
+   * Reproduce sonido de derrota (para modo individual - mantener compatibilidad)
    * @returns {Promise<void>}
    */
   async playLoseSound() {
-    // Melodía triste descendente (Do - La - Fa - Re)
-    const frequencies = [
-      523.25, // C5
-      440.00, // A4
-      349.23, // F4
-      293.66  // D4
-    ];
-    await this.generateMelody(frequencies, 0.25, 0.3);
+    await this.playRoundLoseSound();
   }
 
   /**

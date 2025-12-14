@@ -275,13 +275,9 @@ export default function MultiplayerGameScreen({
             <h2>{gameState.won ? '¡Tu rival ganó esta ronda!' : 'Tu rival perdió esta ronda'}</h2>
             <p>La palabra era: <strong>{gameState.word}</strong></p>
             
-            <div className="game-over-buttons">
-              <button className="btn btn-primary" onClick={handleNewGame}>
-                Siguiente Ronda
-              </button>
-              <button className="btn btn-secondary" onClick={handleExit}>
-                Salir
-              </button>
+            <div className="waiting-next-round">
+              <div className="spinner"></div>
+              <p>Preparando siguiente ronda...</p>
             </div>
           </div>
         )}
@@ -385,13 +381,9 @@ export default function MultiplayerGameScreen({
               <h2>{gameState.won ? '¡Ganaste esta ronda!' : 'Perdiste esta ronda'}</h2>
               <p>La palabra era: <strong>{gameState.word}</strong></p>
               
-              <div className="game-over-buttons">
-                <button className="btn btn-primary" onClick={handleNewGame}>
-                  Siguiente Ronda
-                </button>
-                <button className="btn btn-secondary" onClick={handleExit}>
-                  Salir
-                </button>
+              <div className="waiting-next-round">
+                <div className="spinner"></div>
+                <p>Preparando siguiente ronda...</p>
               </div>
             </div>
           )}

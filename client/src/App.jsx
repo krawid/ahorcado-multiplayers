@@ -109,13 +109,13 @@ function App() {
         }
       }
 
-      // Si el juego terminó
+      // Si la ronda terminó, reproducir sonido de ronda
       if (gameState.gameOver) {
         setTimeout(async () => {
           if (gameState.won) {
-            await audioSystem.playWinSound();
+            await audioSystem.playRoundWinSound();
           } else {
-            await audioSystem.playLoseSound();
+            await audioSystem.playRoundLoseSound();
           }
         }, 500);
       }
@@ -141,7 +141,17 @@ function App() {
     // Cuando hay un ganador definitivo
     socket.on('match-winner', ({ winner, scores, roundResults }) => {
       const iWon = (multiplayerRole === winner);
-      announceToScreenReader(iWon ? '¡Has ganado la partida!' : 'Has perdido la partida', 'assertive');
+      
+      // Reproducir sonido de victoria o derrota de la partida
+      setTimeout(async () => {
+        if (iWon) {
+          await audioSystem.playMatchWinSound();
+          announceToScreenReader('¡Has ganado la partida!', 'assertive');
+        } else {
+          await audioSystem.playMatchLoseSound();
+          announceToScreenReader('Has perdido la partida', 'assertive');
+        }
+      }, 500);
       
       setMultiplayerGameState(prev => ({
         ...prev,
