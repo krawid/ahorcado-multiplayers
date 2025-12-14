@@ -122,32 +122,42 @@ class GameRoom {
   }
 
   checkWinner() {
-    // Si solo hay una ronda, no hay ganador aún
+    // Necesitamos al menos 2 resultados (una ronda completa = ambos jugadores jugaron)
     if (this.roundResults.length < 2) {
       return null;
     }
 
-    // Obtener los dos últimos resultados (las dos últimas rondas)
+    // Verificar que los dos últimos resultados sean de la misma ronda completa
+    // Una ronda completa significa que ambos jugadores han tenido su turno
     const lastTwo = this.roundResults.slice(-2);
     
-    // Identificar quién adivinó en cada ronda
-    const round1 = lastTwo[0]; // { setter: 'host', guesser: 'guest', won: true/false, attemptsUsed: number }
-    const round2 = lastTwo[1]; // { setter: 'guest', guesser: 'host', won: true/false, attemptsUsed: number }
+    // Verificar que sean turnos complementarios (uno como host setter, otro como guest setter)
+    const hasHostSetter = lastTwo.some(r => r.setter === 'host');
+    const hasGuestSetter = lastTwo.some(r => r.setter === 'guest');
+    
+    // Si no tenemos ambos roles, la ronda no está completa
+    if (!hasHostSetter || !hasGuestSetter) {
+      return null;
+    }
+
+    // Identificar los resultados por jugador
+    const hostResult = lastTwo.find(r => r.guesser === 'host');
+    const guestResult = lastTwo.find(r => r.guesser === 'guest');
 
     // Si uno ganó y otro perdió
-    if (round1.won && !round2.won) {
-      return round1.guesser; // El que adivinó correctamente en la primera ronda
+    if (hostResult.won && !guestResult.won) {
+      return 'host';
     }
-    if (!round1.won && round2.won) {
-      return round2.guesser; // El que adivinó correctamente en la segunda ronda
+    if (!hostResult.won && guestResult.won) {
+      return 'guest';
     }
 
     // Si ambos ganaron, gana quien usó menos intentos
-    if (round1.won && round2.won) {
-      if (round1.attemptsUsed < round2.attemptsUsed) {
-        return round1.guesser;
-      } else if (round2.attemptsUsed < round1.attemptsUsed) {
-        return round2.guesser;
+    if (hostResult.won && guestResult.won) {
+      if (hostResult.attemptsUsed < guestResult.attemptsUsed) {
+        return 'host';
+      } else if (guestResult.attemptsUsed < hostResult.attemptsUsed) {
+        return 'guest';
       }
       // Si usaron los mismos intentos, continuar jugando
       return null;
@@ -285,9 +295,9 @@ io.on('connection', (socket) => {
       gameState: room.getPublicState()
     });
 
-    // Si la ronda terminó, verificar automáticamente si hay un ganador de la partida
+    // Si el turno terminó, guardar resultado
     if (room.gameState.gameOver) {
-      // Guardar resultado de la ronda
+      // Guardar resultado del turno
       const guesser = room.currentSetter === 'host' ? 'guest' : 'host';
       const attemptsUsed = room.gameState.maxAttempts - room.gameState.attemptsLeft;
       
@@ -304,24 +314,49 @@ io.on('connection', (socket) => {
         room.scores[guesser]++;
       }
 
-      // Verificar si hay un ganador definitivo
-      const winner = room.checkWinner();
-      
-      if (winner) {
-        // Hay un ganador definitivo - emitir inmediatamente
-        setTimeout(() => {
-          io.to(roomCode).emit('match-winner', {
-            winner: winner,
-            scores: room.scores,
-            roundResults: room.roundResults
-          });
-        }, 2000); // Esperar 2 segundos para que se escuchen los sonidos de ronda
+      // Verificar si la ronda completa ha terminado (ambos jugadores han jugado)
+      // Una ronda completa = 2 turnos (uno con host como setter, otro con guest como setter)
+      const hasHostSetter = room.roundResults.filter(r => r.round === room.currentRound && r.setter === 'host').length > 0;
+      const hasGuestSetter = room.roundResults.filter(r => r.round === room.currentRound && r.setter === 'guest').length > 0;
+      const roundComplete = hasHostSetter && hasGuestSetter;
+
+      if (roundComplete) {
+        // La ronda completa ha terminado, verificar si hay un ganador definitivo
+        const winner = room.checkWinner();
+        
+        if (winner) {
+          // Hay un ganador definitivo - emitir inmediatamente
+          setTimeout(() => {
+            io.to(roomCode).emit('match-winner', {
+              winner: winner,
+              scores: room.scores,
+              roundResults: room.roundResults
+            });
+          }, 2000); // Esperar 2 segundos para que se escuchen los sonidos de turno
+        } else {
+          // No hay ganador aún - iniciar nueva ronda (cambiar roles)
+          setTimeout(() => {
+            room.switchRoles();
+
+            // Resetear estado del juego
+            room.gameState = {
+              word: '',
+              guessedLetters: [],
+              attemptsLeft: room.settings.maxAttempts || 6,
+              maxAttempts: room.settings.maxAttempts || 6,
+              gameOver: false,
+              won: false
+            };
+
+            io.to(roomCode).emit('game-reset', room.getPublicState());
+          }, 2000); // Esperar 2 segundos para que se escuchen los sonidos de turno
+        }
       } else {
-        // No hay ganador aún - cambiar roles para la siguiente ronda
+        // La ronda no está completa, cambiar roles para que juegue el otro
         setTimeout(() => {
           room.switchRoles();
 
-          // Resetear estado del juego
+          // Resetear estado del juego para el siguiente turno
           room.gameState = {
             word: '',
             guessedLetters: [],
@@ -332,7 +367,7 @@ io.on('connection', (socket) => {
           };
 
           io.to(roomCode).emit('game-reset', room.getPublicState());
-        }, 2000); // Esperar 2 segundos para que se escuchen los sonidos de ronda
+        }, 2000); // Esperar 2 segundos para que se escuchen los sonidos de turno
       }
     }
   });
