@@ -95,12 +95,18 @@ function App() {
           
           // Anunciar después de un pequeño delay
           setTimeout(() => {
-            announceToScreenReader(`La palabra queda: ${wordForSpeech}`, 'polite');
+            announceToScreenReader(`La palabra queda: ${wordForSpeech}. Te quedan ${gameState.attemptsLeft} intentos`, 'polite');
           }, 800);
         }
       } else {
         audioSystem.playIncorrectSound();
-        announceToScreenReader(`Incorrecto. La letra ${letter} no está en la palabra`, 'assertive');
+        
+        // Anunciar que es incorrecta y los intentos restantes
+        if (!gameState.gameOver) {
+          announceToScreenReader(`Incorrecto. La letra ${letter} no está en la palabra. Te quedan ${gameState.attemptsLeft} intentos`, 'assertive');
+        } else {
+          announceToScreenReader(`Incorrecto. La letra ${letter} no está en la palabra`, 'assertive');
+        }
       }
 
       // Si el juego terminó
