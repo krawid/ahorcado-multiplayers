@@ -10,16 +10,18 @@ const __dirname = dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 
-// Configurar Socket.io con opciones mejoradas
+// Configurar Socket.io con opciones mejoradas para evitar desconexiones
 const io = new Server(httpServer, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
   },
-  pingTimeout: 60000,
-  pingInterval: 25000,
-  connectTimeout: 45000,
-  transports: ['websocket', 'polling']
+  pingTimeout: 120000, // 2 minutos antes de considerar desconectado
+  pingInterval: 25000, // Enviar ping cada 25 segundos
+  connectTimeout: 60000, // 1 minuto para establecer conexión
+  transports: ['websocket', 'polling'],
+  allowUpgrades: true,
+  upgradeTimeout: 30000
 });
 
 // Servir archivos estáticos del frontend
@@ -205,6 +207,11 @@ app.get('/api/health', (req, res) => {
 // Conexión de Socket.io
 io.on('connection', (socket) => {
   console.log(`Cliente conectado: ${socket.id}`);
+
+  // Heartbeat - responder a pings del cliente
+  socket.on('ping', () => {
+    socket.emit('pong');
+  });
 
   // Crear sala
   socket.on('create-room', (settings, callback) => {
