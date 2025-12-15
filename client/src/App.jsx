@@ -237,6 +237,9 @@ function App() {
     // Actualizar estado
     updateGameState();
 
+    // Obtener estado actualizado
+    const currentState = game.getGameState();
+
     // Si la letra es correcta, anunciar también cómo queda la palabra
     if (result.success && result.correct && !game.gameOver) {
       const displayWord = game.getDisplayWord();
@@ -246,17 +249,20 @@ function App() {
       
       // Anunciar después de un pequeño delay para que se escuche después del mensaje de "correcto"
       setTimeout(() => {
-        announceToScreenReader(`La palabra queda: ${wordForSpeech}`, 'polite');
+        announceToScreenReader(`La palabra queda: ${wordForSpeech}. Te quedan ${currentState.attemptsLeft} intentos`, 'polite');
       }, 800);
+    } else if (result.success && !result.correct && !game.gameOver) {
+      // Si es incorrecta, anunciar intentos restantes
+      announceToScreenReader(`Incorrecto. Te quedan ${currentState.attemptsLeft} intentos`, 'assertive');
     }
 
     // Si el juego terminó, reproducir sonido correspondiente
     if (game.gameOver) {
       setTimeout(async () => {
         if (game.won) {
-          await audioSystem.playWinSound();
+          await audioSystem.playMatchWinSound(); // Aplausos
         } else {
-          await audioSystem.playLoseSound();
+          await audioSystem.playMatchLoseSound(); // Abucheo
         }
       }, 500);
     }
@@ -282,9 +288,9 @@ function App() {
     if (game.gameOver) {
       setTimeout(async () => {
         if (game.won) {
-          await audioSystem.playWinSound();
+          await audioSystem.playMatchWinSound(); // Aplausos
         } else {
-          await audioSystem.playLoseSound();
+          await audioSystem.playMatchLoseSound(); // Abucheo
         }
       }, 500);
     }
@@ -302,13 +308,16 @@ function App() {
       // Actualizar estado primero
       updateGameState();
       
+      // Obtener estado actualizado
+      const currentState = game.getGameState();
+      
       // Anunciar cómo queda la palabra después de la pista
       setTimeout(() => {
         const displayWord = game.getDisplayWord();
         const wordForSpeech = displayWord.split(' ').map(char => 
           char === '_' ? 'guión bajo' : char
         ).join(', ');
-        announceToScreenReader(`La palabra queda: ${wordForSpeech}`, 'polite');
+        announceToScreenReader(`La palabra queda: ${wordForSpeech}. Te quedan ${currentState.attemptsLeft} intentos`, 'polite');
       }, 800);
     } else {
       // Actualizar estado
@@ -318,7 +327,7 @@ function App() {
     // Si el juego terminó con la pista, reproducir sonido de victoria
     if (game.gameOver && game.won) {
       setTimeout(async () => {
-        await audioSystem.playWinSound();
+        await audioSystem.playMatchWinSound(); // Aplausos
       }, 500);
     }
   };
