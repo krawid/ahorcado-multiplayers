@@ -15,6 +15,7 @@ export class AudioSystem {
     this.audioContext = null;
     this.enabled = true;
     this.initialized = false;
+    this.audioCache = {}; // Cache para archivos de audio precargados (crítico para iOS)
   }
 
   /**
@@ -38,12 +39,41 @@ export class AudioSystem {
       }
 
       this.audioContext = new AudioContext();
+      
+      // Precargar archivos de audio (crítico para iOS/Safari)
+      this.preloadAudioFiles();
+      
       this.initialized = true;
       return true;
     } catch (error) {
       console.error('Error al inicializar Web Audio API:', error);
       this.enabled = false;
       return false;
+    }
+  }
+
+  /**
+   * Precarga archivos de audio en el cache
+   * Esto es especialmente importante para iOS/Safari donde los archivos
+   * deben ser cargados después de una interacción del usuario
+   */
+  preloadAudioFiles() {
+    try {
+      console.log('Precargando archivos de audio...');
+      
+      // Precargar archivo de aplausos
+      const applauseAudio = new Audio(applauseSound);
+      applauseAudio.load();
+      this.audioCache['applause'] = applauseAudio;
+      
+      // Precargar archivo de abucheo
+      const booAudio = new Audio(booSound);
+      booAudio.load();
+      this.audioCache['boo'] = booAudio;
+      
+      console.log('Archivos de audio precargados correctamente');
+    } catch (error) {
+      console.error('Error al precargar archivos de audio:', error);
     }
   }
 
@@ -262,10 +292,44 @@ export class AudioSystem {
    * @returns {Promise<void>}
    */
   async playMatchWinSound() {
-    // Reproducir archivo de aplausos
+    // Intentar reproducir archivo de aplausos desde el cache
     try {
       console.log('Intentando reproducir aplausos...');
-      await this.playAudioFile(applauseSound, 0.6);
+      
+      if (this.audioCache['applause']) {
+        // Usar el audio precargado (mejor para iOS)
+        const audio = this.audioCache['applause'];
+        audio.currentTime = 0; // Reiniciar al inicio
+        
+        return new Promise((resolve, reject) => {
+          audio.onended = () => {
+            console.log('Aplausos reproducidos exitosamente');
+            resolve();
+          };
+          
+          audio.onerror = (error) => {
+            console.error('Error en reproducción de aplausos:', error);
+            reject(error);
+          };
+          
+          const playPromise = audio.play();
+          
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                console.log('Reproducción de aplausos iniciada');
+              })
+              .catch((error) => {
+                console.error('Error al iniciar aplausos:', error);
+                reject(error);
+              });
+          }
+        });
+      } else {
+        // Si no hay cache, intentar cargar directamente
+        await this.playAudioFile(applauseSound, 0.6);
+      }
+      
       console.log('Aplausos reproducidos exitosamente');
     } catch (error) {
       // Si falla, usar melodía sintetizada como fallback
@@ -285,10 +349,44 @@ export class AudioSystem {
    * @returns {Promise<void>}
    */
   async playMatchLoseSound() {
-    // Reproducir archivo de abucheo
+    // Intentar reproducir archivo de abucheo desde el cache
     try {
       console.log('Intentando reproducir abucheo...');
-      await this.playAudioFile(booSound, 0.6);
+      
+      if (this.audioCache['boo']) {
+        // Usar el audio precargado (mejor para iOS)
+        const audio = this.audioCache['boo'];
+        audio.currentTime = 0; // Reiniciar al inicio
+        
+        return new Promise((resolve, reject) => {
+          audio.onended = () => {
+            console.log('Abucheo reproducido exitosamente');
+            resolve();
+          };
+          
+          audio.onerror = (error) => {
+            console.error('Error en reproducción de abucheo:', error);
+            reject(error);
+          };
+          
+          const playPromise = audio.play();
+          
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                console.log('Reproducción de abucheo iniciada');
+              })
+              .catch((error) => {
+                console.error('Error al iniciar abucheo:', error);
+                reject(error);
+              });
+          }
+        });
+      } else {
+        // Si no hay cache, intentar cargar directamente
+        await this.playAudioFile(booSound, 0.6);
+      }
+      
       console.log('Abucheo reproducido exitosamente');
     } catch (error) {
       // Si falla, usar melodía sintetizada como fallback
